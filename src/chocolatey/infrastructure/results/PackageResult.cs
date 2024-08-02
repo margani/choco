@@ -49,6 +49,7 @@ namespace chocolatey.infrastructure.results
         public string Source { get; set; }
         public string SourceUri { get; set; }
         public int ExitCode { get; set; }
+        public bool IsPinned { get; set; } = false
 
         public void ResetMetadata(IPackageMetadata metadata, IPackageSearchMetadata search)
         {

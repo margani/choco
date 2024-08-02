@@ -778,7 +778,7 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                         this.Log().Error(ChocolateyLoggers.Important, logMessage);
 
                         foreach (var pkgMetadata in packagesToInstall)
-                        
+
                         {
                             var errorResult = packageResultsToReturn.GetOrAdd(pkgMetadata.Identity.Id, new PackageResult(pkgMetadata, pathResolver.GetInstallPath(pkgMetadata.Identity)));
                             errorResult.Messages.Add(new ResultMessage(ResultType.Error, logMessage));
@@ -1270,12 +1270,12 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                             var logMessage = "{0} is pinned. Skipping pinned package.".FormatWith(packageName);
                             packageResult.Messages.Add(new ResultMessage(ResultType.Warn, logMessage));
                             packageResult.Messages.Add(new ResultMessage(ResultType.Inconclusive, logMessage));
-                            
+
                             if (config.RegularOutput)
                             {
                                 this.Log().Warn(ChocolateyLoggers.Important, logMessage);
                             }
-                            
+
                             continue;
                         }
                         else
@@ -1287,7 +1287,7 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                             {
                                 this.Log().Warn(ChocolateyLoggers.Important, logMessage);
                             }
-                            
+
                             config.PinPackage = true;
                         }
                     }
@@ -1369,7 +1369,7 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                         }
 
                         var removedSources = new HashSet<SourcePackageDependencyInfo>();
-                        
+
                         if (!config.UpgradeCommand.IgnorePinned)
                         {
                             removedSources.AddRange(RemovePinnedSourceDependencies(sourcePackageDependencyInfos, allLocalPackages));
@@ -1726,7 +1726,7 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
             return packageResultsToReturn;
         }
 
-        public virtual ConcurrentDictionary<string, PackageResult> GetOutdated(ChocolateyConfiguration config)
+        private ConcurrentDictionary<string, PackageResult> GetOutdated(ChocolateyConfiguration config)
         {
             var sourceCacheContext = new ChocolateySourceCacheContext(config);
             var remoteRepositories = NugetCommon.GetRemoteRepositories(config, _nugetLogger, _fileSystem);
@@ -1756,7 +1756,10 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                 if (isPinned && config.OutdatedCommand.IgnorePinned)
                 {
                     var pinnedLogMessage = "{0} is pinned. Skipping pinned package.".FormatWith(packageName);
-                    var pinnedPackageResult = outdatedPackages.GetOrAdd(packageName, new PackageResult(installedPackage.PackageMetadata, pathResolver.GetInstallPath(installedPackage.PackageMetadata.Id)));
+                    var pinnedPackageResult = outdatedPackages.GetOrAdd(packageName, new PackageResult(installedPackage.PackageMetadata, pathResolver.GetInstallPath(installedPackage.PackageMetadata.Id)))
+                    {
+                        IsPinned = isPinned
+                    };
                     pinnedPackageResult.Messages.Add(new ResultMessage(ResultType.Debug, pinnedLogMessage));
                     pinnedPackageResult.Messages.Add(new ResultMessage(ResultType.Inconclusive, pinnedLogMessage));
 
@@ -1783,7 +1786,6 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                     unfoundResult.Messages.Add(new ResultMessage(ResultType.Warn, unfoundLogMessage));
                     unfoundResult.Messages.Add(new ResultMessage(ResultType.Inconclusive, unfoundLogMessage));
 
-                    this.Log().Warn("{0}|{1}|{1}|{2}".FormatWith(installedPackage.Name, installedPackage.Version, isPinned.ToStringSafe().ToLowerSafe()));
                     continue;
                 }
 
@@ -1797,7 +1799,6 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                 var logMessage = "You have {0} v{1} installed. Version {2} is available based on your source(s).{3} Source(s): \"{4}\"".FormatWith(installedPackage.Name, installedPackage.Version, latestPackage.Identity.Version, Environment.NewLine, config.Sources);
                 packageResult.Messages.Add(new ResultMessage(ResultType.Note, logMessage));
 
-                this.Log().Info("{0}|{1}|{2}|{3}".FormatWith(installedPackage.Name, installedPackage.Version, latestPackage.Identity.Version, isPinned.ToStringSafe().ToLowerSafe()));
             }
 
             // Reset the configuration again once we are completely done with the processing of
@@ -1806,6 +1807,59 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
             config.RevertChanges(removeBackup: true);
 
             return outdatedPackages;
+        }
+
+        private ConcurrentDictionary<string, PackageResult> GetOutdatedLog(ChocolateyConfiguration config)
+        {
+            var outdatedPackages = GetOutdated(config);
+
+            foreach (var packageName in outdatedPackages.Keys)
+            {
+                var packageResult = outdatedPackages[packageName];
+                foreach (var message in packageResult.Messages)
+                {
+                    if (message.MessageType == ResultType.Warn)
+                    {
+                        this.Log().Warn("{0}|{1}|{1}|{2}".FormatWith(packageName, packageResult.Version, packageResult.IsPinned.ToStringSafe().ToLowerSafe()));
+                    }
+
+                    if (message.MessageType == ResultType.Note)
+                    {
+                        this.Log().Info("{0}|{1}|{2}|{3}".FormatWith(packageName, packageResult.Version, packageResult.Version, isPinned.ToStringSafe().ToLowerSafe()));
+                    }
+                }
+            }
+
+            return outdatedPackages;
+        }
+
+        private ConcurrentDictionary<string, PackageResult> GetOutdatedJson(ChocolateyConfiguration config)
+        {
+            var outdatedPackages = GetOutdated(config);
+
+            foreach (var packageName in outdatedPackages.Keys)
+            {
+                var packageResult = outdatedPackages[packageName];
+                foreach (var message in packageResult.Messages)
+                {
+                    if (message.MessageType == ResultType.Warn)
+                    {
+                        this.Log().Warn("{0}|{1}|{1}|{2}".FormatWith(packageName, packageResult.Version, packageResult.IsPinned.ToStringSafe().ToLowerSafe()));
+                    }
+
+                    if (message.MessageType == ResultType.Note)
+                    {
+                        this.Log().Info("{0}|{1}|{2}|{3}".FormatWith(packageName, packageResult.Version, packageResult.Version, isPinned.ToStringSafe().ToLowerSafe()));
+                    }
+                }
+            }
+
+            return outdatedPackages;
+        }
+
+        public virtual ConcurrentDictionary<string, PackageResult> GetOutdated(ChocolateyConfiguration config)
+        {
+            return GetOutdatedLog(config);
         }
 
         /// <summary>
@@ -3018,7 +3072,7 @@ Please see https://docs.chocolatey.org/en-us/troubleshooting for more
                 {
                     using (var metadataFileStream = downloadResult.PackageReader.GetStream(PackagingCoreConstants.NupkgMetadataFileExtension))
                     {
-                        var metadataFileContents = NupkgMetadataFileFormat.Read(metadataFileStream, 
+                        var metadataFileContents = NupkgMetadataFileFormat.Read(metadataFileStream,
                                                                                 _nugetLogger,
                                                                                 PackagingCoreConstants.NupkgMetadataFileExtension);
 
